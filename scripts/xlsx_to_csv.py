@@ -1,33 +1,94 @@
 """
-Converts all FEMS exported XLSX files to CSV.
+Converts FEMS exported XLSX files directly to the normalized format.
 
-The CSV file is written next to the XLSX file using the same filename.
+Before running the script
+Get data from "http://192.168.178.57/device/0/history"
+Store it in data-FEMS-export
+
+Input:
+    ../data-FEMS-export/*.xlsx
+
+Output:
+    ../data/20260807_fenecon_complete.csv
+
+Output format:
+    datetime,power
+    2026-08-07 00:00:00,0.0
+    ...
 """
 
 from pathlib import Path
 
 import pandas as pd
 
-DIRECTORY = Path("../data-FEMS-export")
+INPUT_DIR = Path("../data-FEMS-export")
+OUTPUT_DIR = Path("../data")
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Find all Excel files
-xlsx_files = sorted(DIRECTORY.glob("*.xlsx"))
+for xlsx_file in sorted(INPUT_DIR.glob("*.xlsx")):
 
-if not xlsx_files:
-    print(f"No XLSX files found in {DIRECTORY.resolve()}")
+    print(f"Processing {xlsx_file.name}")
 
-for xlsx_file in xlsx_files:
-    print(f"Converting {xlsx_file.name}...")
+    # Read complete worksheet without interpreting headers
+    df = pd.read_excel(xlsx_file, header=None)
 
-    # Read first sheet
-    df = pd.read_excel(xlsx_file)
+    # ------------------------------------------------------------------
+    # Find the table header ("Datum / Uhrzeit")
+    # ------------------------------------------------------------------
 
-    # Output filename
-    csv_file = xlsx_file.with_suffix(".csv")
+    header_row = None
 
-    # Save as CSV
-    df.to_csv(csv_file, index=False, encoding="utf-8")
+    for idx, row in df.iterrows():
+        if "Datum / Uhrzeit" in row.values:
+            header_row = idx
+            break
 
-    print(f" -> {csv_file.name}")
+    if header_row is None:
+        print("  -> No data table found")
+        continue
+
+    # ------------------------------------------------------------------
+    # Read worksheet again using the detected header row
+    # ------------------------------------------------------------------
+
+    df = pd.read_excel(
+        xlsx_file,
+        header=header_row,
+    )
+
+    # Keep only the required columns
+    df = df[["Datum / Uhrzeit", "Erzeugung [W]"]]
+
+    # Rename columns
+    df = df.rename(
+        columns={
+            "Datum / Uhrzeit": "datetime",
+            "Erzeugung [W]": "power",
+        }
+    )
+
+    # Convert datetime
+    df["datetime"] = pd.to_datetime(
+        df["datetime"],
+        format="%d.%m.%Y %H:%M:%S %z",
+    ).dt.tz_localize(None)
+
+    # Convert W -> kW
+    df["power"] = df["power"] / 1000.0
+
+    # Format datetime
+    df["datetime"] = df["datetime"].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    # ------------------------------------------------------------------
+    # Generate output filename
+    # ------------------------------------------------------------------
+
+    date = pd.to_datetime(df.iloc[0]["datetime"]).strftime("%Y%m%d")
+
+    outfile = OUTPUT_DIR / f"{date}_fenecon_complete.csv"
+
+    df.to_csv(outfile, index=False)
+
+    print(f"  -> {outfile.name}")
 
 print("Done.")

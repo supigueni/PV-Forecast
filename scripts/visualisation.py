@@ -1,12 +1,11 @@
 """
-visualisation of PV power data
-- loads csv files from directory "data" as Dataframes in different groups (or lists)
-- groups are determined by file name (example: 20260807_open_meteo_so)
-    - open_meteo_so
-    - open_meteo_sw
-    - open_meteo_complete
-- shows plot of the data for each group (x: datetime, y: power)
+Visualization of PV power data.
+
+- Loads normalized CSV files from ../data
+- Groups files by variant (so, sw, complete)
+- Plots all files belonging to the same variant into one figure
 """
+
 from pathlib import Path
 
 import matplotlib
@@ -17,47 +16,74 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 DATA_DIR = Path("../data")
-
-# Groups are determined by the suffix of the filename
-GROUPS = [
-    "open_meteo_so",
-    "open_meteo_sw",
-    "open_meteo_complete",
-]
-
-# Dictionary: group -> list of DataFrames
-data = {group: [] for group in GROUPS}
-
-# Load all CSV files
-for file in DATA_DIR.glob("*.csv"):
-    for group in GROUPS:
-        if file.stem.endswith(group):
-            df = pd.read_csv(file)
-
-            # Convert datetime column
-            df["datetime"] = pd.to_datetime(df["datetime"])
-
-            # Sort by datetime just in case
-            df = df.sort_values("datetime")
-
-            data[group].append(df)
-            break
-
-
-# Plot one figure per group
-
 PLOT_DIR = Path("plots")
 PLOT_DIR.mkdir(exist_ok=True)
 
-for group, dfs in data.items():
-    if not dfs:
-        print(f"No data for {group}")
+# Variants to compare
+GROUPS = [
+    "so",
+    "sw",
+    "complete",
+]
+
+# Dictionary: variant -> list of datasets
+data = {group: [] for group in GROUPS}
+
+# ----------------------------------------------------------------------
+# Load data
+# ----------------------------------------------------------------------
+
+for file in sorted(DATA_DIR.glob("*.csv")):
+    stem = file.stem
+
+    for group in GROUPS:
+        if stem.endswith(f"_{group}"):
+
+            df = pd.read_csv(file)
+
+            df["datetime"] = pd.to_datetime(df["datetime"])
+            df = df.sort_values("datetime")
+
+            # Expected filename:
+            # YYYYMMDD_source_variant.csv
+            parts = stem.split("_", 2)
+
+            if len(parts) == 3:
+                date, source, variant = parts
+            else:
+                date = ""
+                source = ""
+                variant = group
+
+            data[group].append(
+                {
+                    "date": date,
+                    "source": source,
+                    "variant": variant,
+                    "filename": stem,
+                    "df": df,
+                }
+            )
+
+            print(f"Loaded {stem}")
+            break
+
+# ----------------------------------------------------------------------
+# Plot data
+# ----------------------------------------------------------------------
+
+for group, datasets in data.items():
+
+    if not datasets:
+        print(f"No data for '{group}'")
         continue
 
     fig, ax = plt.subplots(figsize=(14, 6))
 
-    for i, df in enumerate(dfs):
-        label = df["datetime"].dt.date.iloc[0].isoformat()
+    for entry in datasets:
+
+        df = entry["df"]
+
         ax.plot(
             df["datetime"],
             df["power"],
@@ -65,15 +91,15 @@ for group, dfs in data.items():
             linestyle="-",
             markersize=3,
             linewidth=1,
-            alpha=0.6,
-            label=label,
+            alpha=0.7,
+            label=entry["filename"],
         )
 
     ax.set_title(group)
     ax.set_xlabel("Datetime")
-    ax.set_ylabel("Power [W]")
+    ax.set_ylabel("Power [kW]")
     ax.grid(True)
-    ax.legend()
+    ax.legend(fontsize=8)
 
     fig.tight_layout()
 
@@ -83,3 +109,5 @@ for group, dfs in data.items():
     plt.close(fig)
 
     print(f"Saved {filename}")
+
+print("Done.")
