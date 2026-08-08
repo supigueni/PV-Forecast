@@ -11,7 +11,7 @@ logging.basicConfig(
 
 url = "https://api.open-meteo.com/v1/forecast"
 
-LOCATION = {"b": 49.08, "l": 9.59}  # Mainhardt
+LOCATION = {"b": 49.082778, "l": 9.556667}  # Mainhardt Kirchstrasse 27
 PEAK_POWER_SO = 5.0  # kW
 PEAK_POWER_SW = 6.0  # kW
 
