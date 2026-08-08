@@ -73,8 +73,19 @@ for xlsx_file in sorted(INPUT_DIR.glob("*.xlsx")):
         format="%d.%m.%Y %H:%M:%S %z",
     ).dt.tz_localize(None)
 
+    print(df.dtypes)
+    print(df.head())
+    print(df.tail())
+
+    # Convert power to numeric - handles incomplete days
+    # "-" and other invalid values become NaN
+    df["power"] = pd.to_numeric(df["power"], errors="coerce")
+
+    # Remove rows without measurements yet
+    df = df.dropna(subset=["power"])
+
     # Convert W -> kW
-    df["power"] = df["power"] / 1000.0
+    df["power"] /= 1000.0
 
     # Format datetime
     df["datetime"] = df["datetime"].dt.strftime("%Y-%m-%d %H:%M:%S")
