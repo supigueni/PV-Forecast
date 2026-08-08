@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/PcForecastCorrection.iml" filepath="$PROJECT_DIR$/.idea/PcForecastCorrection.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/PVForecastCorrection.iml" filepath="$PROJECT_DIR$/.idea/PVForecastCorrection.iml" />
     </modules>
   </component>
 </project>
