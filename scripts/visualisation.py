@@ -15,8 +15,9 @@ matplotlib.use("TkAgg", force=True)
 import matplotlib.pyplot as plt
 import pandas as pd
 
-DATA_DIR = Path("../data")
-PLOT_DIR = Path("plots")
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+PLOT_DIR = BASE_DIR / "plots"
 PLOT_DIR.mkdir(exist_ok=True)
 
 # Variants to compare

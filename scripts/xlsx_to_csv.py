@@ -21,8 +21,9 @@ from pathlib import Path
 
 import pandas as pd
 
-INPUT_DIR = Path("../data-FEMS-export")
-OUTPUT_DIR = Path("../data")
+BASE_DIR = Path(__file__).resolve().parent.parent
+INPUT_DIR = BASE_DIR / "data-FEMS-export"
+OUTPUT_DIR = BASE_DIR / "data"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 for xlsx_file in sorted(INPUT_DIR.glob("*.xlsx")):
