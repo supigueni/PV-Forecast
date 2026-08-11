@@ -2,8 +2,10 @@
 Visualization of PV power data.
 
 - Loads normalized CSV files from ../data
-- Groups files by variant (so, sw, complete)
-- Plots all files belonging to the same variant into one figure
+- Groups files by source variant
+- Merges each source into one time series
+- Saves each source series as CSV in ../plots
+- Plots each source series with markers to show measured points
 """
 
 from pathlib import Path
@@ -62,7 +64,7 @@ for file in sorted(DATA_DIR.glob("*.csv")):
     print(f"Loaded {stem} as source {source_full}")
 
 # ----------------------------------------------------------------------
-# Build one timeseries per source, then merge into a wide table (one column per source)
+# Build one merged timeseries per source and save each source as CSV and PNG
 per_source = {}
 
 for source, entries in data.items():
@@ -88,54 +90,28 @@ for source, entries in data.items():
         src_series = pd.concat(src_frames).groupby(level=0).mean()
         per_source[source] = src_series
 
-if per_source:
-    # union all timestamps
-    all_index = None
-    for s, ser in per_source.items():
-        if all_index is None:
-            all_index = ser.index
-        else:
-            all_index = all_index.union(ser.index)
-    all_index = all_index.sort_values()
+if not per_source:
+    print("No datasets found to merge per source")
 
-    # determine a reasonable frequency (use minimum delta)
-    if len(all_index) >= 2:
-        diffs = all_index.to_series().diff().dropna()
-        min_diff = diffs.min()
-        if pd.isna(min_diff) or min_diff == pd.Timedelta(0):
-            min_diff = pd.Timedelta(minutes=1)
-    else:
-        min_diff = pd.Timedelta(minutes=1)
+for source, series in per_source.items():
+    series = series.sort_index()
+    output_csv = PLOT_DIR / f"{source}.csv"
+    series.reset_index().rename(columns={"datetime": "datetime", source: "power"}).to_csv(output_csv, index=False)
+    print(f"Saved {output_csv}")
 
-    full_index = pd.date_range(start=all_index.min(), end=all_index.max(), freq=min_diff)
-
-    wide = pd.DataFrame(index=full_index)
-    for source, ser in per_source.items():
-        wide[source] = ser.reindex(full_index)
-
-    wide = wide.sort_index()
-    wide = wide.interpolate(method="time", limit_direction="both")
-
-    combined_file = PLOT_DIR / "combined_wide.csv"
-    wide.reset_index().rename(columns={"index": "datetime"}).to_csv(combined_file, index=False)
-    print(f"Saved combined wide dataset to {combined_file}")
-    # Plot wide combined dataset: one color/label per source
     fig, ax = plt.subplots(figsize=(14, 6))
-    cmap = plt.get_cmap("tab10")
-    colors = cmap.colors if hasattr(cmap, "colors") else [cmap(i) for i in range(10)]
+    ax.plot(
+        series.index,
+        series[source],
+        marker="o",
+        linestyle="-",
+        markersize=4,
+        linewidth=1,
+        alpha=0.8,
+        label=source,
+    )
 
-    for i, col in enumerate(wide.columns):
-        ax.plot(
-            wide.index,
-            wide[col],
-            label=col,
-            color=colors[i % len(colors)],
-            linewidth=1,
-            marker="",
-            alpha=0.9,
-        )
-
-    ax.set_title("Combined PV Power by Source")
+    ax.set_title(source)
     ax.set_xlabel("Datetime")
     ax.set_ylabel("Power [kW]")
     ax.grid(True)
@@ -143,50 +119,54 @@ if per_source:
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
     fig.autofmt_xdate()
     fig.tight_layout()
-    combined_png = PLOT_DIR / "combined_datasets.png"
-    fig.savefig(combined_png, dpi=200)
+
+    output_png = PLOT_DIR / f"{source}.png"
+    fig.savefig(output_png, dpi=200)
     plt.close(fig)
-    print(f"Saved combined dataset plot to {combined_png}")
-else:
-    print("No datasets found to combine")
+
+    print(f"Saved {output_png}")
 
 # ----------------------------------------------------------------------
-# Plot data
-# ----------------------------------------------------------------------
-
-for source, datasets in data.items():
+# Combined comparison plot for fenecon_complete and open_meteo_complete
+if "fenecon_complete" in per_source and "open_meteo_complete" in per_source:
+    fenecon = per_source["fenecon_complete"].sort_index()
+    open_meteo = per_source["open_meteo_complete"].sort_index()
 
     fig, ax = plt.subplots(figsize=(14, 6))
+    ax.plot(
+        fenecon.index,
+        fenecon,
+        marker="o",
+        linestyle="-",
+        markersize=4,
+        linewidth=1,
+        alpha=0.8,
+        label="fenecon_complete",
+    )
+    ax.plot(
+        open_meteo.index,
+        open_meteo,
+        marker="o",
+        linestyle="-",
+        markersize=4,
+        linewidth=1,
+        alpha=0.8,
+        label="open_meteo_complete",
+    )
 
-    for entry in datasets:
-        df = entry["df"]
-
-        ax.plot(
-            df["datetime"],
-            df["power"],
-            marker="o",
-            linestyle="-",
-            markersize=3,
-            linewidth=1,
-            alpha=0.7,
-            label=entry["filename"],
-        )
-
-    ax.set_title(source)
+    ax.set_title("Fenecon Complete vs Open Météo Complete")
     ax.set_xlabel("Datetime")
     ax.set_ylabel("Power [kW]")
     ax.grid(True)
     ax.legend(fontsize=8)
-
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
+    fig.autofmt_xdate()
     fig.tight_layout()
 
-    filename = PLOT_DIR / f"{source}.png"
-    fig.savefig(filename, dpi=200)
-
+    comparison_png = PLOT_DIR / "fenecon_vs_open_meteo_complete.png"
+    fig.savefig(comparison_png, dpi=200)
     plt.close(fig)
+    print(f"Saved {comparison_png}")
+else:
+    print("Skipping combined comparison plot: required sources missing")
 
-    print(f"Saved {filename}")
-
-
-
-# Additional grouping/plotting was consolidated earlier; nothing to do here.
