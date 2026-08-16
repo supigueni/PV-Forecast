@@ -82,7 +82,31 @@ for source, entries in data.items():
             except Exception:
                 pass
 
-        df = df.set_index("datetime")[ ["power"] ].rename(columns={"power": source})
+        # select the value column: prefer 'power', otherwise infer from the file
+        value_col = None
+        cols = list(df.columns)
+        other_cols = [c for c in cols if c != "datetime"]
+        if "power" in cols:
+            value_col = "power"
+        else:
+            # prefer any column that contains 'power' in its name
+            power_like = [c for c in other_cols if "power" in c.lower()]
+            if power_like:
+                value_col = power_like[0]
+            else:
+                # prefer a column that matches the source name
+                source_col = [c for c in other_cols if c == source or source in c]
+                if source_col:
+                    value_col = source_col[0]
+                elif len(other_cols) == 1:
+                    value_col = other_cols[0]
+
+        if value_col is None:
+            # skip files without a usable value column
+            print(f"Skipping {entry.get('filename')}: no value column found (columns={cols})")
+            continue
+
+        df = df.set_index("datetime")[[value_col]].rename(columns={value_col: source})
         src_frames.append(df)
 
     if src_frames:
@@ -167,6 +191,22 @@ if "fenecon_complete" in per_source and "open_meteo_complete" in per_source:
     fig.savefig(comparison_png, dpi=200)
     plt.close(fig)
     print(f"Saved {comparison_png}")
+
+    # save CSVs for fenecon_complete and open_meteo_complete
+    fenecon_csv = DATA_DIR / "_fenecon_complete.csv"
+    fenecon.to_csv(fenecon_csv, index=True)
+    print(f"Saved {fenecon_csv}")
+
+    open_meteo_csv = DATA_DIR / "_open_meteo_complete.csv"
+    open_meteo.to_csv(open_meteo_csv, index=True)
+    print(f"Saved {open_meteo_csv}")
+
+    combined_csv = DATA_DIR / "_combined_complete.csv"
+    combined = pd.DataFrame(index=fenecon.index.union(open_meteo.index))
+    combined["fenecon_power"] = fenecon.reindex(combined.index).interpolate()
+    combined["open_meteo_power"] = open_meteo.reindex(combined.index).interpolate()
+    combined.to_csv(combined_csv, index=True)
+    print(f"Saved {combined_csv}")
 else:
     print("Skipping combined comparison plot: required sources missing")
 

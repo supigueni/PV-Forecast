@@ -12,13 +12,13 @@ logging.basicConfig(
 url = "https://api.open-meteo.com/v1/forecast"
 url_historical = "https://archive-api.open-meteo.com/v1/archive"
 
-LOCATION = {"b": 49.082778, "l": 9.556667}  # Mainhardt Kirchstrasse 27
+LOCATION = {"lat": 49.082778, "lon": 9.556667}  # Mainhardt Kirchstrasse 27
 PEAK_POWER_SO = 5.0  # kW
 PEAK_POWER_SW = 6.0  # kW
 
 params_so = {
-    "latitude": LOCATION["b"],
-    "longitude": LOCATION["l"],
+    "latitude": LOCATION["lat"],
+    "longitude": LOCATION["lon"],
     "tilt": 45,
     "azimuth": -45,
     "hourly": "global_tilted_irradiance",
@@ -27,8 +27,8 @@ params_so = {
 }
 
 params_sw = {
-    "latitude": LOCATION["b"],
-    "longitude": LOCATION["l"],
+    "latitude": LOCATION["lat"],
+    "longitude": LOCATION["lon"],
     "tilt": 45,
     "azimuth": 45,
     "hourly": "global_tilted_irradiance",
