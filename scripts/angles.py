@@ -43,6 +43,9 @@ if combined_csv_path.exists():
     # assign by position to avoid index misalignment between df and solar_position
     df["azimuth"] = solar_position["azimuth"].values
     df["elevation"] = solar_position["elevation"].values
+    # ensure numeric types for plotting (convert any NA-like values to NaN)
+    df["azimuth"] = pd.to_numeric(df["azimuth"], errors="coerce")
+    df["elevation"] = pd.to_numeric(df["elevation"], errors="coerce")
 
     # ensure power columns are numeric and drop rows with missing positions or power
     df["fenecon_power"] = pd.to_numeric(df["fenecon_power"], errors="coerce")
@@ -52,7 +55,7 @@ if combined_csv_path.exists():
     # plot power (z) vs azimuth (x) and elevation (y) angles
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(plot_df["azimuth"].values, plot_df["elevation"].values, plot_df["fenecon_power"].values, c=plot_df["fenecon_power"].values, cmap="viridis")
+    ax.scatter(plot_df["azimuth"].to_numpy(dtype=float), plot_df["elevation"].to_numpy(dtype=float), plot_df["fenecon_power"].to_numpy(dtype=float), c=plot_df["fenecon_power"].to_numpy(dtype=float), cmap="viridis")
     ax.set_xlabel("Azimuth (degrees)")
     ax.set_ylabel("Elevation (degrees)")
     ax.set_zlabel("Power (kW)")
@@ -65,7 +68,7 @@ if combined_csv_path.exists():
     plot_df2 = df.dropna(subset=["azimuth", "elevation", "open_meteo_power"]).copy()
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(plot_df2["azimuth"].values, plot_df2["elevation"].values, plot_df2["open_meteo_power"].values, c=plot_df2["open_meteo_power"].values, cmap="plasma")
+    ax.scatter(plot_df2["azimuth"].to_numpy(dtype=float), plot_df2["elevation"].to_numpy(dtype=float), plot_df2["open_meteo_power"].to_numpy(dtype=float), c=plot_df2["open_meteo_power"].to_numpy(dtype=float), cmap="plasma")
     ax.set_xlabel("Azimuth (degrees)")
     ax.set_ylabel("Elevation (degrees)")
     ax.set_zlabel("Power (kW)")
@@ -75,20 +78,30 @@ if combined_csv_path.exists():
 
     # calculate relative error between fenecon_power and open_meteo_power
     # - avoid division by zero
-    # - e = (fenecon - open_meteo) / fenecon
+    # - relative error: e = (fenecon - open_meteo) / fenecon
+    # corrected_forecast = open_meteo * correction_factor
+    # - forecast correction correction_factor = fenecon / open_meteo (limit between 0 and 1)
 
     df["relative_error"] = (df["fenecon_power"] - df["open_meteo_power"]) / df["fenecon_power"].replace(0, pd.NA)
     df["relative_error"] = pd.to_numeric(df["relative_error"], errors="coerce")
+    df["correction_factor"] = pd.to_numeric(df["fenecon_power"] / df["open_meteo_power"].replace(0, pd.NA), errors="coerce")
+    df["correction_factor"] = df["correction_factor"].clip(0, 1)  # Limit correction factor between 0 and 1
     # plot relative error vs azimuth and elevation angles (drop NA)
     plot_df3 = df.dropna(subset=["azimuth", "elevation", "relative_error"]).copy()
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(plot_df3["azimuth"].values, plot_df3["elevation"].values, plot_df3["relative_error"].values, c=plot_df3["relative_error"].values, cmap="coolwarm")
+    ax.scatter(plot_df3["azimuth"].to_numpy(dtype=float), plot_df3["elevation"].to_numpy(dtype=float), plot_df3["correction_factor"].to_numpy(dtype=float), c=plot_df3["correction_factor"].to_numpy(dtype=float), cmap="coolwarm")
+    # show also the color bar for correction factor
+    cbar = plt.colorbar(ax.collections[0], ax=ax, shrink=0.5, aspect=10)
+    cbar.set_label("Correction Factor")
     ax.set_xlabel("Azimuth (degrees)")
     ax.set_ylabel("Elevation (degrees)")
-    ax.set_zlabel("Relative Error")
-    plt.title("Relative Error vs Sun Angles")
-    plt.savefig(PLOT_DIR / "relative_error_vs_sun_angles.png")
-    print(f"Saved plot to {PLOT_DIR / 'relative_error_vs_sun_angles.png'}")
+    ax.set_zlabel("Correction Factor")
+    plt.title("Correction Factor vs Sun Angles")
+    plt.savefig(PLOT_DIR / "correction_factor_vs_sun_angles.png")
+    print(f"Saved plot to {PLOT_DIR / 'correction_factor_vs_sun_angles.png'}")
+
+    print(df.head(80))
+    plt.show()
 else:
     print(f"Combined CSV file not found at {combined_csv_path}. Please run the data combination script first.")
