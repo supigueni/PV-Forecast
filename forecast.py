@@ -162,6 +162,6 @@ def get_and_save_historical_forecast(start_date: str, end_date: str):
 if __name__ == '__main__':
     get_and_save_forcast()
     
-    # start_date = "2026-08-10" # YYYY-MM-DD format
+    # start_date = "2026-08-16" # YYYY-MM-DD format
     # end_date = start_date  # For a single day, start_date and end_date are the same
     # get_and_save_historical_forecast(start_date, end_date)
